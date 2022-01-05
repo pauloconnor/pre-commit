@@ -16,8 +16,17 @@ VALIDATE_ERROR=0
 for dir in $(echo "$@" | xargs -n1 dirname | sort -u | uniq); do
   echo "--> Running 'terraform validate' in directory '$dir'"
   pushd "$dir" >/dev/null
-  terraform init -backend=false || VALIDATE_ERROR=$?
-  terraform validate || VALIDATE_ERROR=$?
+  # Try running validate to see if Terraform needs initialisation
+  set +e
+  OUTPUT=$(terraform validate 2>&1)
+  if [ $? -ne 0 ] && echo "${OUTPUT}" | grep -q "Module not installed"; then
+    set -e
+    terraform init -backend=false || VALIDATE_ERROR=$?
+    terraform validate || VALIDATE_ERROR=$?
+  else
+    echo "${OUTPUT}"
+  fi
+  set -e
   popd >/dev/null
 done
 
